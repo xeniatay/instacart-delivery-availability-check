@@ -65,6 +65,10 @@ def check_delivery_times_for_store(store_name):
     else: 
         go_to(INSTACART_DELIVERY_URL.format(store_name))
         sleep(5)
+
+        while (Text('More times').exists()):
+            click(Button('More times'))
+
         message = S('#react-tabs-1').web_element.text
 
     keywords_list = [
@@ -150,8 +154,8 @@ def main():
             send_simple_message(subject,text)
 
         if deliveryAvailability:
-            print("\nNext update in 1 hour...\n")
-            time.sleep(3600)
+            print("\nNext update in 1 day...\n")
+            time.sleep(3600 * 24)
         else:
             print("\nNext update in 15 minutes...\n")
             time.sleep(900)
