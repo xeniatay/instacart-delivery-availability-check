@@ -9,13 +9,14 @@ import sys
 
 # -- data -- #
 credentials = json.load(open("credentials.json"))
-CDC_EMAIL = credentials["CDC_EMAIL"]
-CDC_PASSWORD = credentials["CDC_PASSWORD"]
+SCH_EMAIL = credentials["SCH_EMAIL"]
+SCH_PASSWORD = credentials["SCH_PASSWORD"]
 MAILGUN_URL = credentials["MAILGUN_DOMAIN"]
 MAILGUN_API_KEY = credentials["MAILGUN_API_KEY"]
 STORE_LIST = credentials["STORE_LIST"]
-CDC_BASE_URL = credentials["CDC_BASE_URL"]
-CDC_DELIVERY_URL = credentials["CDC_DELIVERY_URL"]
+SCH_BASE_URL = credentials["SCH_BASE_URL"]
+STORE = credentials["STORE"]
+SCH_DELIVERY_URL = credentials["SCH_DELIVERY_URL"]
 NOTIFICATION_EMAILS = credentials["NOTIFICATION_EMAILS"]
 
 DEV_ENVIRONMENT = False
@@ -23,21 +24,21 @@ DEV_ENVIRONMENT = False
 # -- login logic -- #
 
 
-def login_to_CDC():
+def login_to_SCH():
     if DEV_ENVIRONMENT == True:
         return None
 
-    print("Logging into CDC...")
-    start_chrome(CDC_BASE_URL, headless=True)
+    print("Logging in...")
+    start_chrome(SCH_BASE_URL, headless=True)
     # sleep(10)
-    wait_until(S(".cdc-logo").exists)
+    wait_until(S(f".{STORE}-logo").exists)
     print("Click 'Log In'...")
     click(S('.mobile-menu-btn'))
     sleep(5)
     click(S('.login-btn'))
     print("Enter login credentials...")
-    write(CDC_EMAIL, into="Learner ID")
-    write(CDC_PASSWORD, into="password")
+    write(SCH_EMAIL, into="Learner ID")
+    write(SCH_PASSWORD, into="password")
     print("Click log in...")
     click(Button("Login"))
     print("Wait for page to load...")
@@ -105,10 +106,10 @@ def check_delivery_times_for_store():
             get_driver().execute_script(
                 "arguments[0].setAttribute('type', 'button')", input)
 
-            if src == "https://www.cdc.com.sg:8080/NewPortal/Images/Class3/Images0.gif":
+            if src == f"{SCH_BASE_URL}:8080/NewPortal/Images/Class3/Images0.gif":
                 get_driver().execute_script(
                     "arguments[0].remove()", input)
-            elif src == "https://www.cdc.com.sg:8080/NewPortal/Images/Class3/Images1.gif":
+            elif src == f"{SCH_BASE_URL}:8080/NewPortal/Images/Class3/Images1.gif":
                 session_number = input.get_attribute('name').rsplit('$', 1)[
                     1].replace('btnSession', '')
                 get_driver().execute_script(
@@ -147,7 +148,7 @@ def send_simple_message(subject, text):
                 "https://api.mailgun.net/v3/{}/messages".format(MAILGUN_URL),
                 auth=("api", MAILGUN_API_KEY),
                 data={
-                    "from": "CDC Lesson Notifier <CDC_notify@{}>".format(
+                    "from": "SCH Lesson Notifier <SCH_notify@{}>".format(
                         MAILGUN_URL
                     ),
                     "to": to,
@@ -164,7 +165,7 @@ def send_simple_message(subject, text):
 
 
 def main():
-    login_to_CDC()
+    login_to_SCH()
 
     emailNotification = True
     message_cache = ""
