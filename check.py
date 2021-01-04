@@ -9,98 +9,110 @@ import sys
 
 # -- data -- #
 credentials = json.load(open("credentials.json"))
-INSTACART_EMAIL = credentials["INSTACART_EMAIL"]
-INSTACART_PASSWORD = credentials["INSTACART_PASSWORD"]
+CDC_EMAIL = credentials["CDC_EMAIL"]
+CDC_PASSWORD = credentials["CDC_PASSWORD"]
 MAILGUN_URL = credentials["MAILGUN_DOMAIN"]
 MAILGUN_API_KEY = credentials["MAILGUN_API_KEY"]
 STORE_LIST = credentials["STORE_LIST"]
-INSTACART_BASE_URL = credentials["INSTACART_BASE_URL"]
-INSTACART_DELIVERY_URL = credentials["INSTACART_DELIVERY_URL"]
+CDC_BASE_URL = credentials["CDC_BASE_URL"]
+CDC_DELIVERY_URL = credentials["CDC_DELIVERY_URL"]
 NOTIFICATION_EMAILS = credentials["NOTIFICATION_EMAILS"]
 
 DEV_ENVIRONMENT = False
 
 # -- login logic -- #
-def login_to_instacart():
+
+def login_to_CDC():
     if DEV_ENVIRONMENT == True:
         return None
 
-    print("Logging into Instacart...")
-    start_chrome(INSTACART_BASE_URL, headless=True)
+    print("Logging into CDC...")
+    start_chrome(CDC_BASE_URL, headless=True)
+    # sleep(10)
+    wait_until(S(".cdc-logo").exists)
     print("Click 'Log In'...")
-    click(Button("Log In"))
+    click(S('.mobile-menu-btn'))
+    sleep(5)
+    click(S('.login-btn'))
     print("Enter login credentials...")
-    write(INSTACART_EMAIL, into="email")
-    write(INSTACART_PASSWORD, into="password")
+    write(CDC_EMAIL, into="Learner ID")
+    write(CDC_PASSWORD, into="password")
     print("Click log in...")
-    click(Button("Log In"))
+    click(Button("Login"))
     print("Wait for page to load...")
     # idk why but this borked
-    # wait_until(Text("Your Items").exists)
-    sleep(5)
+    wait_until(Text("TAY ZHI YING XENIA").exists)
+    # sleep(5)
 
 
 # -- check store logic -- #
-def check_delivery_times_for_store(store_name):
-    print(f"Checking available delivery slots for {store_name}...")
-
-    if DEV_ENVIRONMENT == True:
-        message = """
-            Prices listed for orders $35 and above per store. Demand is higher than normal. When you choose "Fast & Flexible", your order will be taken once a shopper is available.
-            Fast & Flexible
-            Apr 17 - Apr 18
-            FREE
-            Sunday, April 19
-            9am - 11am
-            FREE
-            Wednesday, April 22
-            1pm - 3pm
-            FREE
-            2pm - 4pm
-            FREE
-            3pm - 5pm
-            FREE
-            More times
-        """
-    else: 
-        go_to(INSTACART_DELIVERY_URL.format(store_name))
-        sleep(5)
-
-        has_more_times = Text('More times').exists()
-        while has_more_times:
-            try:
-                click(Button('More times'))
-            except:
-                has_more_times = False
-                pass
-
-        message = S('#react-tabs-3').web_element.text
+def check_delivery_times_for_store():
+    print(f"Checking available lessons...")
 
     keywords_list = [
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-        "Sunday",
-        "Today", 
-        "Tomorrow",
-        "More Times"
+        "9 Jan 2021",
+        "10 Jan 2021",
+        "11 Jan 2021",
+        "12 Jan 2021",
+        "13 Jan 2021",
+        "14 Jan 2021",
+        "09/Jan/2021",
+        "10/Jan/2021",
+        "11/Jan/2021",
+        "12/Jan/2021",
+        "13/Jan/2021",
+        "14/Jan/2021",
+        "session available"
     ]
 
-    if any(word in message for word in keywords_list) and 'am - ' in message: 
-        return True, message
-    elif "There was a problem loading this page" in message:
-        return False, "There was a problem loading {}".format(store_name)
-    elif "No delivery times available" in message:
-        return False, "No Delivery times available for {}".format(store_name)
+    if DEV_ENVIRONMENT == True:
+        message = """test"""
     else:
-        return False, "No ideal delivery times found."
+        click(Link("Practical Lesson"))
+        wait_until(Text("Select Course").exists)
+
+        option = "-Please Select-"
+        print(f"Selecting {option}")
+
+        option = "03. Class 3A Motorcar"
+        # option = "Circuit Enhancement Practice (CEP) - Auto"
+
+        print(f"Selecting {option}")
+        select(ComboBox('select'), option)
+        sleep(5)
+
+        message = S('#aspnetForm > table:nth-child(11) > tbody > tr > td:nth-child(2) > table > tbody > tr:nth-child(2) > td > div > table > tbody > tr:nth-child(3) > td > table').web_element.text
+
+    if any(word in message for word in keywords_list) and "sessions available" in message:
+        # if "sessions available" in message:
+        print("Lesson slots")
+
+        lesson_slots = S(
+            '#ctl00_ContentPlaceHolder1_gvLatestav').web_element
+
+        for input in lesson_slots.find_elements_by_tag_name('input'):
+            src = input.get_attribute('src')
+            get_driver().execute_script(
+                "arguments[0].setAttribute('type', 'button')", input)
+
+            if src == "https://www.cdc.com.sg:8080/NewPortal/Images/Class3/Images0.gif":
+                get_driver().execute_script(
+                    "arguments[0].setAttribute('value', '')", input)
+            elif src == "https://www.cdc.com.sg:8080/NewPortal/Images/Class3/Images1.gif":
+                get_driver().execute_script(
+                    "arguments[0].setAttribute('value', 'SLOT')", input)
+
+        lesson_slots_html = lesson_slots.get_attribute('innerHTML')
+        lesson_slots_text = lesson_slots.text
+
+        return True, lesson_slots_html, lesson_slots_text
+    else:
+        return False, "No lessons found.", "No lessons found."
+
 
 # -- format email message -- #
 def create_email(messages):
-    subject = "Delivery times found at"
+    subject = "Lesson times found at"
     text = ""
 
     for message, store in messages:
@@ -113,8 +125,8 @@ def create_email(messages):
 # -- send email -- #
 def send_simple_message(subject, text):
 
-    if (MAILGUN_API_KEY=="") or (MAILGUN_API_KEY=="xxx") or (MAILGUN_URL=="") or (MAILGUN_URL=="xxx.mailgun.org"):
-        print ("ERROR: Can't sent email notification. Invalid Mailgun API Key, URL or Notification Email")
+    if (MAILGUN_API_KEY == "") or (MAILGUN_API_KEY == "xxx") or (MAILGUN_URL == "") or (MAILGUN_URL == "xxx.mailgun.org"):
+        print("ERROR: Can't sent email notification. Invalid Mailgun API Key, URL or Notification Email")
         return None
 
     if DEV_ENVIRONMENT == False:
@@ -123,55 +135,69 @@ def send_simple_message(subject, text):
                 "https://api.mailgun.net/v3/{}/messages".format(MAILGUN_URL),
                 auth=("api", MAILGUN_API_KEY),
                 data={
-                    "from": "Instacart Delivery Notifier <instacart_notify@{}>".format(
+                    "from": "CDC Lesson Notifier <CDC_notify@{}>".format(
                         MAILGUN_URL
                     ),
                     "to": to,
                     "subject": subject,
-                    "text": text,
+                    # "text": text,
+                    "html": text,
                 },
             )
-            print (f"'{subject}' email sent to {to}")
+            print(f"'{subject}' email sent to {to}")
 
     return None
 
 # -- check all stores in list and notify -- #
+
+
 def main():
-    login_to_instacart()
+    login_to_CDC()
 
     emailNotification = True
+    message_cache = ""
 
-    while True: 
-        print("--------------- "+str(datetime.now().strftime("%b %d, %Y %H:%M:%S"))+" ------------")
+    if DEV_ENVIRONMENT == True or emailNotification == False:
+        print(f"! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! WARNING DEV MODE IS ON OR EMAILS ARE OFF")
+
+    while True:
+        print("--------------- " +
+              str(datetime.now().strftime("%b %d, %Y %H:%M:%S"))+" ------------")
 
         try:
-            deliveryAvailability = False
+            lessonAvailability = False
             messages = []
 
             for store in STORE_LIST:
-                availability, message = check_delivery_times_for_store(store)
-                # print(message)
+                availability, message, message_plain_text = check_delivery_times_for_store()
+
                 if availability == True:
                     messages.append({message: message, store: store})
-                    deliveryAvailability = True
-                    print(f"Delivery times found for {store}")
+                    lessonAvailability = True
+                    print(f"Lesson times found for {store}!")
 
-            if deliveryAvailability and emailNotification:
+                    if message_cache == message:
+                        print('No new lessons, skipping email notification')
+                        lessonAvailability = False
+                    else:
+                        print(message_plain_text)
+                        message_cache = message
+                else:
+                    print(message_plain_text)
+
+            if lessonAvailability and emailNotification:
                 subject, text = create_email(messages)
-                send_simple_message(subject,text)
+                send_simple_message(subject, text)
 
-            if deliveryAvailability:
-                print("\nNext update in 1 day...\n")
-                time.sleep(3600 * 24)
-            else:
-                print("\nNext update in 15 minutes...\n")
-                time.sleep(900)
+            time_to_wait = 30
+            print(f"\nNext update in {time_to_wait/60} minute(s)...\n")
+            time.sleep(time_to_wait)
         except Exception as e:
-            print("\nException occured, try again in 15 minutes...\n")
+            print(
+                f"\nException occured, try again in {time_to_wait/60} minute(s)...\n")
             print(e)
-            time.sleep(900)
+            time.sleep(time_to_wait)
             pass
-
 
 
 if __name__ == "__main__":
