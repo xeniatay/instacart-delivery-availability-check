@@ -66,10 +66,15 @@ def check_delivery_times_for_store(store_name):
         go_to(INSTACART_DELIVERY_URL.format(store_name))
         sleep(5)
 
-        while (Text('More times').exists()):
-            click(Button('More times'))
+        has_more_times = Text('More times').exists()
+        while has_more_times:
+            try:
+                click(Button('More times'))
+            except:
+                has_more_times = False
+                pass
 
-        message = S('#react-tabs-1').web_element.text
+        message = S('#react-tabs-3').web_element.text
 
     keywords_list = [
         "Monday",
@@ -139,26 +144,34 @@ def main():
     while True: 
         print("--------------- "+str(datetime.now().strftime("%b %d, %Y %H:%M:%S"))+" ------------")
 
-        deliveryAvailability = False
-        messages = []
+        try:
+            deliveryAvailability = False
+            messages = []
 
-        for store in STORE_LIST:
-            availability, message = check_delivery_times_for_store(store)
-            print(message)
-            if availability == True:
-                messages.append({message: message, store: store})
-                deliveryAvailability = True
+            for store in STORE_LIST:
+                availability, message = check_delivery_times_for_store(store)
+                # print(message)
+                if availability == True:
+                    messages.append({message: message, store: store})
+                    deliveryAvailability = True
+                    print(f"Delivery times found for {store}")
 
-        if deliveryAvailability and emailNotification:
-            subject, text = create_email(messages)
-            send_simple_message(subject,text)
+            if deliveryAvailability and emailNotification:
+                subject, text = create_email(messages)
+                send_simple_message(subject,text)
 
-        if deliveryAvailability:
-            print("\nNext update in 1 day...\n")
-            time.sleep(3600 * 24)
-        else:
-            print("\nNext update in 15 minutes...\n")
+            if deliveryAvailability:
+                print("\nNext update in 1 day...\n")
+                time.sleep(3600 * 24)
+            else:
+                print("\nNext update in 15 minutes...\n")
+                time.sleep(900)
+        except Exception as e:
+            print("\nException occured, try again in 15 minutes...\n")
+            print(e)
             time.sleep(900)
+            pass
+
 
 
 if __name__ == "__main__":
