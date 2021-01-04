@@ -22,6 +22,7 @@ DEV_ENVIRONMENT = False
 
 # -- login logic -- #
 
+
 def login_to_CDC():
     if DEV_ENVIRONMENT == True:
         return None
@@ -65,6 +66,16 @@ def check_delivery_times_for_store():
         "session available"
     ]
 
+    sessions = {
+        "1": "08:30 - 10:10",
+        "2": "10:20 - 12:00",
+        "3": "12:45 - 14:25",
+        "4": "14:35 - 16:15",
+        "5": "16:25 - 18:05",
+        "6": "18:50 - 20:30",
+        "7": "20:40 - 22:20"
+    }
+
     if DEV_ENVIRONMENT == True:
         message = """test"""
     else:
@@ -84,11 +95,10 @@ def check_delivery_times_for_store():
         message = S('#aspnetForm > table:nth-child(11) > tbody > tr > td:nth-child(2) > table > tbody > tr:nth-child(2) > td > div > table > tbody > tr:nth-child(3) > td > table').web_element.text
 
     if any(word in message for word in keywords_list) and "sessions available" in message:
-        # if "sessions available" in message:
-        print("Lesson slots")
-
-        lesson_slots = S(
-            '#ctl00_ContentPlaceHolder1_gvLatestav').web_element
+    # if "sessions available" in message:
+        lesson_slots = S('#ctl00_ContentPlaceHolder1_gvLatestav').web_element
+        get_driver().execute_script(
+            "arguments[0].querySelector('tbody > tr:nth-child(1)').remove()", lesson_slots)
 
         for input in lesson_slots.find_elements_by_tag_name('input'):
             src = input.get_attribute('src')
@@ -97,15 +107,18 @@ def check_delivery_times_for_store():
 
             if src == "https://www.cdc.com.sg:8080/NewPortal/Images/Class3/Images0.gif":
                 get_driver().execute_script(
-                    "arguments[0].setAttribute('value', '')", input)
+                    "arguments[0].remove()", input)
             elif src == "https://www.cdc.com.sg:8080/NewPortal/Images/Class3/Images1.gif":
+                session_number = input.get_attribute('name').rsplit('$', 1)[
+                    1].replace('btnSession', '')
                 get_driver().execute_script(
-                    "arguments[0].setAttribute('value', 'SLOT')", input)
+                    f"arguments[0].append('{sessions[session_number]}')", input)
 
-        lesson_slots_html = lesson_slots.get_attribute('innerHTML')
-        lesson_slots_text = lesson_slots.text
+        # Flush variable
+        lesson_slots = S('#ctl00_ContentPlaceHolder1_gvLatestav').web_element
+        lesson_slots_text = lesson_slots.text.replace('/2021', '')
 
-        return True, lesson_slots_html, lesson_slots_text
+        return True, lesson_slots_text, lesson_slots_text
     else:
         return False, "No lessons found.", "No lessons found."
 
@@ -113,11 +126,10 @@ def check_delivery_times_for_store():
 # -- format email message -- #
 def create_email(messages):
     subject = "Lesson times found at"
-    text = ""
 
     for message, store in messages:
         subject = f"{subject} {store}"
-        text = f"{text}\n{store}: {message}"
+        text = f"{message}"
 
     return subject, text
 
@@ -140,8 +152,8 @@ def send_simple_message(subject, text):
                     ),
                     "to": to,
                     "subject": subject,
-                    # "text": text,
-                    "html": text,
+                    "text": text,
+                    # "html": text,
                 },
             )
             print(f"'{subject}' email sent to {to}")
@@ -156,6 +168,8 @@ def main():
 
     emailNotification = True
     message_cache = ""
+    time_to_wait = 30  # seconds
+    exception = False
 
     if DEV_ENVIRONMENT == True or emailNotification == False:
         print(f"! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! WARNING DEV MODE IS ON OR EMAILS ARE OFF")
@@ -189,10 +203,15 @@ def main():
                 subject, text = create_email(messages)
                 send_simple_message(subject, text)
 
-            time_to_wait = 30
             print(f"\nNext update in {time_to_wait/60} minute(s)...\n")
             time.sleep(time_to_wait)
         except Exception as e:
+            if exception == False: 
+                send_simple_message('Script Error', e)
+            else: 
+                print("Script Error, skipping email notification.")
+
+            exception = True
             print(
                 f"\nException occured, try again in {time_to_wait/60} minute(s)...\n")
             print(e)
